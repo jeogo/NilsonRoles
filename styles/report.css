@@ -1,0 +1,54 @@
+.report-section {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.6s ease forwards;
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.score-card {
+  transition: transform 0.3s ease;
+}
+
+.score-card:hover {
+  transform: translateY(-5px);
+}
+
+.principle-card {
+  transition: all 0.3s ease;
+}
+
+.principle-card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.chart-container {
+  opacity: 0;
+  animation: fadeIn 1s ease forwards;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-only {
+    display: block !important;
+  }
+  
+  .report-content {
+    padding: 20px !important;
+    background: white !important;
+  }
+}
