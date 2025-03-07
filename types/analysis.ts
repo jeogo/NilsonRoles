@@ -5,14 +5,20 @@ export interface NelsonPrinciple {
   feedback: string;
 }
 
-export interface PageSpeedData {
-  lighthouseResult: {
-    categories: {
-      performance: { score: number; };
-      accessibility?: { score: number; };
-      'best-practices'?: { score: number; };
+interface PageSpeedData {
+  lighthouseResult?: {
+    audits?: {
+      'first-contentful-paint'?: { score: number };
+      'cumulative-layout-shift'?: { score: number };
+      'max-potential-fid'?: { score: number };
+      'largest-contentful-paint'?: { score: number };
     };
-    audits: Record<string, any>;
+    categories?: {
+      performance: { score: number };
+      accessibility?: { score: number };
+      'best-practices'?: { score: number };
+      seo?: { score: number };
+    };
   };
 }
 

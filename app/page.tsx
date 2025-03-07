@@ -1,24 +1,25 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { 
   Button, Paper, Typography, TextField, Box, Container, 
   CircularProgress, Alert, Snackbar, Stepper, Step, 
-  StepLabel, Fade, LinearProgress, Tooltip, IconButton, Grid
+  StepLabel, Fade, LinearProgress, Grid
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import rtlPlugin from 'stylis-plugin-rtl';
 import { prefixer } from 'stylis';
 import { CacheProvider } from '@emotion/react';
 import createCache from '@emotion/cache';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SearchIcon from '@mui/icons-material/Search';
 
 import analysisAnimation from '../animations/analysis.json';
-import { AnalysisData, PageSpeedData, SecurityData, NelsonPrinciple } from '../types/analysis';
+import { AnalysisData } from '../types/analysis';
+import { validateUrl } from '../utils/urlValidator';
+import { calculateNelsonPrinciples } from '../utils/analysisEngine';
 
 // RTL setup for Arabic
 const cacheRtl = createCache({
@@ -145,7 +146,7 @@ const Footer = () => (
     <Container maxWidth="lg">
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
-          <Typography variant="h6" fontWeight="bold" mb={2}>
+          <Typography variant="h6" fontWeight="bold" color="black" mb={2}>
             عن المشروع
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -224,6 +225,7 @@ export default function Home() {
   const [activeStep, setActiveStep] = useState(0);
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [forceAnalyze, setForceAnalyze] = useState(false); // إضافة حالة جديدة لتجاوز التحقق
 
   const handleAnalyze = async () => {
     if (!url) {
@@ -231,30 +233,34 @@ export default function Home() {
       return;
     }
     
-    // Add protocol if missing
-    let processedUrl = url;
-    if (!url.match(/^(http|https):\/\//i)) {
-      processedUrl = 'https://' + url;
-      setUrl(processedUrl);
-    }
-    
-    // Basic URL validation
-    if (!processedUrl.match(/^(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}(:[0-9]{1,5})?(\/.*)?$/i)) {
-      setError('يرجى إدخال رابط صالح يبدأ بـ http:// أو https://');
-      return;
-    }
-    
-    setError('');
+    // تحقق محسّن من صلاحية الرابط
     setLoading(true);
-    setActiveStep(0);
-    setAnalysisProgress(0);
-
-    // Start analysis with animated progress
-    const progressInterval = setInterval(() => {
-      setAnalysisProgress(prev => Math.min(prev + 1, 90));
-    }, 200);
+    setError('');
+    setSnackbarMessage('جاري التحقق من الرابط...');
+    setOpenSnackbar(true);
     
     try {
+      const validationResult = await validateUrl(url);
+      
+      if (!validationResult.isValid) {
+        setError(validationResult.message || 'الرابط غير صالح');
+        setLoading(false);
+        return;
+      }
+      
+      // في حال نجاح التحقق نستمر في عملية التحليل
+      const processedUrl = validationResult.url;
+      setUrl(processedUrl);
+      
+      setActiveStep(0);
+      setAnalysisProgress(0);
+      
+      // بداية التحليل مع تقدم متحرك
+      const progressInterval = setInterval(() => {
+        setAnalysisProgress(prev => Math.min(prev + 1, 90));
+      }, 200);
+      
+      // بقية كود التحليل...
       let analysisData: AnalysisData = {
         websiteUrl: processedUrl,
         analysisDate: new Date().toISOString(),
@@ -422,200 +428,6 @@ export default function Home() {
       setOpenSnackbar(true);
       setLoading(false);
     }
-  };
-
-  // Calculate Nelson's usability principles based on collected API data and URL features
-  const calculateNelsonPrinciples = (analysisData: AnalysisData, url: string) => {
-    // Initialize principles
-    const nelsonPrinciples = [
-      { 
-        name: 'وضوح حالة النظام', 
-        score: 70, 
-        description: 'مدى وضوح حالة النظام ومعرفة المستخدم بما يحدث',
-        feedback: 'يمكن تحسين وضوح حالة النظام من خلال إضافة مؤشرات تقدم وتنبيهات أكثر وضوحًا'
-      },
-      { 
-        name: 'الملاءمة مع العالم الواقعي', 
-        score: 75, 
-        description: 'استخدام لغة ومفاهيم مألوفة للمستخدم',
-        feedback: 'الموقع يستخدم مصطلحات مفهومة للمستخدم العادي' 
-      },
-      { 
-        name: 'حرية التحكم للمستخدم', 
-        score: 60, 
-        description: 'القدرة على التراجع عن الأخطاء وحرية التنقل',
-        feedback: 'تحسين خيارات التراجع عن الإجراءات وتوفير مخارج واضحة'
-      },
-      { 
-        name: 'الاتساق والمعايير', 
-        score: 65, 
-        description: 'اتباع معايير ثابتة عبر الموقع',
-        feedback: 'الموقع متسق في معظم صفحاته مع بعض التباينات البسيطة في التنسيق'
-      },
-      { 
-        name: 'منع الأخطاء', 
-        score: 65, 
-        description: 'تصميم يمنع حدوث الأخطاء قبل وقوعها',
-        feedback: 'يمكن تحسين التحقق من صحة المدخلات وتوفير إرشادات أوضح قبل اتخاذ إجراءات مهمة'
-      },
-      { 
-        name: 'التعرف بدلاً من التذكر', 
-        score: 70, 
-        description: 'تقليل الحمل المعرفي عبر واجهة سهلة التعرف',
-        feedback: 'الموقع يقدم واجهة سهلة الاستخدام مع عناصر تحكم واضحة ومرئية'
-      },
-      { 
-        name: 'المرونة وكفاءة الاستخدام', 
-        score: 70, 
-        description: 'توفير اختصارات للمستخدمين المتقدمين',
-        feedback: 'يمكن إضافة المزيد من الاختصارات وتخصيص الواجهة للمستخدمين المتكررين'
-      },
-      { 
-        name: 'التصميم الجمالي والبسيط', 
-        score: 75, 
-        description: 'واجهة بسيطة وخالية من العناصر غير الضرورية',
-        feedback: 'التصميم جذاب بشكل عام مع إمكانية تبسيط بعض الصفحات الفرعية'
-      },
-      { 
-        name: 'مساعدة المستخدم على تشخيص الأخطاء', 
-        score: 60, 
-        description: 'رسائل خطأ واضحة ومفيدة',
-        feedback: 'تحسين رسائل الخطأ لتكون أكثر تحديدًا وتوفير حلول مباشرة'
-      },
-      { 
-        name: 'المساعدة والتوثيق', 
-        score: 65, 
-        description: 'توفير مساعدة وتوثيق سهل الوصول',
-        feedback: 'إضافة صفحات مساعدة أكثر تفصيلاً وتوفير أدلة استخدام موجزة'
-      },
-    ];
-
-    // Adjust scores based on PageSpeed results
-    if (analysisData.pageSpeedData && analysisData.pageSpeedData.lighthouseResult) {
-      const result = analysisData.pageSpeedData.lighthouseResult;
-      
-      // Performance affects "System Status Visibility" and "Aesthetic Design"
-      const performance = result.categories?.performance?.score * 100 || 0;
-      nelsonPrinciples[0].score = adjustScore(nelsonPrinciples[0].score, performance, 0.3);
-      nelsonPrinciples[7].score = adjustScore(nelsonPrinciples[7].score, performance, 0.3);
-      
-      // Get real user feedback and customize it based on score
-      if (performance < 50) {
-        nelsonPrinciples[0].feedback = 'الموقع يعاني من بطء في الاستجابة. يجب تحسين سرعة التحميل وإضافة مؤشرات أثناء انتظار تحميل المحتوى';
-      } else if (performance < 80) {
-        nelsonPrinciples[0].feedback = 'وضوح حالة النظام مقبول. يمكن تحسينه عبر إضافة مؤشرات تحميل وإشعارات أكثر وضوحًا';
-      } else {
-        nelsonPrinciples[0].feedback = 'الموقع يتميز بسرعة استجابة جيدة وتغذية راجعة مرئية واضحة للمستخدم';
-      }
-      
-      // User experience metrics affect multiple principles
-      if (result.audits) {
-        // First Contentful Paint affects "System Status Visibility"
-        const fcp = result.audits['first-contentful-paint']?.score * 100 || 0;
-        nelsonPrinciples[0].score = adjustScore(nelsonPrinciples[0].score, fcp, 0.2);
-        
-        // Largest Contentful Paint affects "Flexibility and Efficiency"
-        const lcp = result.audits['largest-contentful-paint']?.score * 100 || 0;
-        nelsonPrinciples[6].score = adjustScore(nelsonPrinciples[6].score, lcp, 0.3);
-        
-        // Cumulative Layout Shift affects "Error Prevention" and "Aesthetic Design"
-        const cls = result.audits['cumulative-layout-shift']?.score * 100 || 0;
-        nelsonPrinciples[4].score = adjustScore(nelsonPrinciples[4].score, cls, 0.2);
-        nelsonPrinciples[7].score = adjustScore(nelsonPrinciples[7].score, cls, 0.2);
-        
-        // Accessibility affects "User Control" and "Error Prevention"
-        const accessibility = (result.categories?.accessibility?.score ?? 0) * 100;
-        if (accessibility > 0) {result.categories?.accessibility?.score
-          nelsonPrinciples[2].score = adjustScore(nelsonPrinciples[2].score, accessibility, 0.4);
-          nelsonPrinciples[4].score = adjustScore(nelsonPrinciples[4].score, accessibility, 0.3);
-          
-          // Customize feedback based on accessibility score
-          if (accessibility < 60) {
-            nelsonPrinciples[2].feedback = 'الموقع يحتاج إلى تحسينات كبيرة في مجال إمكانية الوصول والتنقل باستخدام لوحة المفاتيح';
-          } else if (accessibility < 80) {
-            nelsonPrinciples[2].feedback = 'إمكانية الوصول مقبولة نسبياً، لكن يمكن تحسين دعم قارئات الشاشة وتباين الألوان';
-          } else {
-            nelsonPrinciples[2].feedback = 'الموقع يقدم تجربة جيدة من حيث إمكانية الوصول والتحكم للمستخدم';
-          }
-        }
-        
-        // Best Practices affects "Consistency and Standards"
-        const bestPractices = (result.categories && 'best-practices' in result.categories) 
-          ? (result.categories['best-practices']?.score ?? 0) * 100 
-          : 0;
-        if (bestPractices > 0) {
-          nelsonPrinciples[3].score = adjustScore(nelsonPrinciples[3].score, bestPractices, 0.5);
-          
-          // Customize feedback based on best practices score
-          if (bestPractices < 60) {
-            nelsonPrinciples[3].feedback = 'الموقع لا يتبع العديد من معايير الويب الحديثة. يجب تحسين الاتساق في التصميم والوظائف';
-          } else if (bestPractices < 80) {
-            nelsonPrinciples[3].feedback = 'الموقع يتبع معظم معايير الويب الأساسية مع وجود بعض الاستثناءات. ضبط التوافقية عبر المتصفحات';
-          } else {
-            nelsonPrinciples[3].feedback = 'الموقع يتبع معايير الويب الحديثة بشكل جيد ويقدم تجربة متسقة';
-          }
-        }
-      }
-    }
-
-    // Adjust scores based on HTML validation results
-    if (analysisData.htmlValidationData) {
-      const errorCount = analysisData.htmlValidationData.messages?.filter((m: { type: string; }) => m.type === 'error')?.length || 0;
-      const warningCount = analysisData.htmlValidationData.messages?.filter((m: { type: string; }) => m.type === 'warning')?.length || 0;
-      
-      // Calculate HTML validity score (inverse of error count)
-      const htmlScore = Math.max(0, 100 - errorCount * 5 - warningCount * 2);
-      
-      // HTML validity affects "Error Prevention", "Consistency" and "Aesthetic Design"
-      nelsonPrinciples[4].score = adjustScore(nelsonPrinciples[4].score, htmlScore, 0.3);
-      nelsonPrinciples[3].score = adjustScore(nelsonPrinciples[3].score, htmlScore, 0.2);
-      nelsonPrinciples[7].score = adjustScore(nelsonPrinciples[7].score, htmlScore, 0.1);
-      
-      // Customize feedback based on HTML validity
-      if (htmlScore < 60) {
-        nelsonPrinciples[4].feedback = 'هناك العديد من أخطاء HTML التي قد تؤثر على تجربة المستخدم. يجب مراجعة بنية الصفحة';
-      } else if (htmlScore < 80) {
-        nelsonPrinciples[4].feedback = 'توجد بعض أخطاء HTML وتحذيرات بسيطة. تصحيحها سيحسن من تجربة المستخدم وتوافق المتصفحات';
-      } else {
-        nelsonPrinciples[4].feedback = 'بنية HTML صحيحة وملائمة. الموقع يمنع الأخطاء بشكل جيد';
-      }
-    }
-
-    // Adjust scores based on security scan results
-    if (analysisData.securityData && analysisData.securityData.results) {
-      // Calculate security score based on whether site uses HTTPS
-      const isHttps = url.startsWith('https://');
-      const securityScore = isHttps ? 85 : 60;
-      
-      // Security affects "Error Prevention" and "Help and Documentation"
-      nelsonPrinciples[4].score = adjustScore(nelsonPrinciples[4].score, securityScore, 0.2);
-      nelsonPrinciples[9].score = adjustScore(nelsonPrinciples[9].score, securityScore, 0.2);
-      
-      // Customize feedback based on security
-      if (!isHttps) {
-        nelsonPrinciples[9].feedback = 'الموقع لا يستخدم HTTPS. يجب تحسين أمان الموقع وإضافة التوثيق المتعلق بخصوصية المستخدم';
-      } else {
-        nelsonPrinciples[9].feedback = 'الموقع يستخدم HTTPS بشكل صحيح. يمكن تحسين التوثيق والمساعدة المقدمة للمستخدم';
-      }
-    }
-    
-    // Commented out random factor to keep scoring results consistent
-    // nelsonPrinciples.forEach(principle => {
-    //   const randomFactor = 0.9 + Math.random() * 0.2; // Between 0.9 and 1.1
-    //   principle.score = Math.min(100, Math.max(0, principle.score * randomFactor));
-    // });
-
-    // Round all scores to integer values
-    nelsonPrinciples.forEach(principle => {
-      principle.score = Math.round(principle.score);
-    });
-
-    return nelsonPrinciples;
-  };
-
-  // Helper function to adjust scores based on metrics
-  const adjustScore = (baseScore: number, metricScore: number, weight: number) => {
-    return baseScore * (1 - weight) + metricScore * weight;
   };
 
   const handleCloseSnackbar = () => {
@@ -794,6 +606,7 @@ export default function Home() {
                   align="center" 
                   fontWeight="bold"
                   sx={{ mb: 6 }}
+                  color='black'
                 >
                   مميزات التحليل
                 </Typography>

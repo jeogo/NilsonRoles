@@ -8,16 +8,19 @@
   --primary: #2c6faa;
   --primary-dark: #1a365d;
   --secondary: #0097a7;
+  --transition-speed: 0.3s;
 }
 
-* {
-  transition: all 0.3s ease;
-}
+/* Remove universal transition - it can cause performance issues */
+/* Apply transitions only to specific elements that need them */
 
 body {
   font-family: 'Tajawal', sans-serif;
-  background: linear-gradient(135deg, #f5f7ff 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #fafbff 0%, #ffffff 100%);
   min-height: 100vh;
+  margin: 0; /* Ensure consistent margins */
+  -webkit-font-smoothing: antialiased; /* Better text rendering */
+  -moz-osx-font-smoothing: grayscale; /* Better text rendering in Firefox */
 }
 
 .glass-morphism {
@@ -26,16 +29,24 @@ body {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  /* Fallback for browsers that don't support backdrop-filter */
+  @supports not (backdrop-filter: blur(20px)) {
+    background: rgba(255, 255, 255, 0.95);
+  }
 }
 
 .gradient-text {
   background: linear-gradient(45deg, var(--primary-dark), var(--primary));
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  color: var(--primary); /* Fallback */
 }
 
 .hover-lift {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform var(--transition-speed) ease-out, 
+              box-shadow var(--transition-speed) ease-out;
+  will-change: transform, box-shadow; /* Optimize for animations */
 }
 
 .hover-lift:hover {
@@ -43,7 +54,7 @@ body {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar with better cross-browser support */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -62,9 +73,16 @@ body {
   background: var(--primary-dark);
 }
 
-/* Loading animation */
+/* Firefox scrollbar */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) #f1f1f1;
+}
+
+/* Optimized loading animation */
 .loading-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: opacity; /* Hint browser to optimize */
 }
 
 @keyframes pulse {
@@ -76,9 +94,11 @@ body {
   }
 }
 
-/* Card hover effects */
+/* Optimized card hover effects */
 .card-hover {
-  transition: all 0.3s ease;
+  transition: transform var(--transition-speed) ease-out, 
+              box-shadow var(--transition-speed) ease-out;
+  will-change: transform, box-shadow;
 }
 
 .card-hover:hover {
@@ -86,37 +106,67 @@ body {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
 }
 
-/* Button hover effects */
+/* Optimized button hover effects */
 .button-gradient {
   background: linear-gradient(45deg, var(--primary), var(--secondary));
-  transition: all 0.3s ease;
+  transition: filter var(--transition-speed) ease-out, 
+              transform var(--transition-speed) ease-out,
+              box-shadow var(--transition-speed) ease-out;
+  will-change: filter, transform, box-shadow;
 }
 
 .button-gradient:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.08);
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(44, 111, 170, 0.4);
+  box-shadow: 0 8px 25px rgba(44, 111, 170, 0.35);
 }
 
-/* Smooth scrolling */
+/* Smooth scrolling with better compatibility */
 html {
   scroll-behavior: smooth;
 }
 
-/* Add glass morphism effect */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto; /* Respect user preference for reduced motion */
+  }
+  
+  .hover-lift:hover,
+  .card-hover:hover,
+  .button-gradient:hover {
+    transform: none; /* Disable transform animations */
+  }
+  
+  .loading-pulse,
+  .animate-float,
+  .animate-gradient {
+    animation: none; /* Disable animations */
+  }
+}
+
+/* Glass effect with fallbacks */
 .glass {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.18);
+  
+  /* Fallback for browsers that don't support backdrop-filter */
+  @supports not (backdrop-filter: blur(10px)) {
+    background: rgba(255, 255, 255, 0.9);
+  }
 }
 
 .dark .glass {
   background: rgba(17, 24, 39, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  
+  @supports not (backdrop-filter: blur(10px)) {
+    background: rgba(17, 24, 39, 0.9);
+  }
 }
 
-/* Add subtle floating animation */
+/* Optimized floating animation */
 @keyframes float {
   0% {
     transform: translateY(0px);
@@ -131,6 +181,7 @@ html {
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
+  will-change: transform;
 }
 
 @layer utilities {
