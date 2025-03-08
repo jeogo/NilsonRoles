@@ -330,7 +330,7 @@ export default function Report() {
     try {
       setLoading(true);
       const blob = await pdf(
-        <ReportPDF data={data} radarChart={radarChartImage} pieChart={pieChartImage} />
+        <ReportPDF data={data} radarChart={radarChartImage} pieChart={pieChartImage} lineChart={''} barChart={''} />
       ).toBlob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
