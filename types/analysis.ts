@@ -1,14 +1,17 @@
 export interface NelsonPrinciple {
   name: string;
-  score: number;
   description: string;
+  score: number;
   feedback: string;
+  improvementSuggestions?: string[];
 }
 
 interface PageSpeedData {
   lighthouseResult?: {
     audits?: {
-      'first-contentful-paint'?: { score: number };
+      'first-contentful-paint'?: {
+        numericValue: any; score: number 
+};
       'cumulative-layout-shift'?: { score: number };
       'max-potential-fid'?: { score: number };
       'largest-contentful-paint'?: { score: number };
@@ -35,10 +38,12 @@ export interface SecurityData {
 export interface AnalysisData {
   websiteUrl: string;
   analysisDate: string;
-  pageSpeedData: PageSpeedData | null;
-  accessibilityData: any | null;
-  htmlValidationData: { messages: { type: string; message: string; }[] } | null;
-  securityData: SecurityData | null;
-  cssValidationData: any | null;
+  htmlValidationData: any;
+  pageSpeedData: any;
+  securityData: any;
   nelsonPrinciples: NelsonPrinciple[];
+  seoData?: any;
+  accessibilityData?: any;
+  cssValidationData?: any;
+  screenshotUrl?: string;
 }

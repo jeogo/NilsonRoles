@@ -1,4 +1,5 @@
 import { AnalysisData, NelsonPrinciple } from '../types/analysis';
+import { validateHTML, getPageSpeedData, getSecurityAnalysis } from './api';
 
 // الفئات والمعايير المستخدمة في التحليل
 export enum AnalysisCategory {
@@ -19,15 +20,22 @@ interface EvaluationCriteria {
 }
 
 /**
- * تقييم سرعة التحميل (FCP)
+ * تحسين تقييم سرعة التحميل مع معايير أكثر صرامة
  */
 const evaluateFirstContentfulPaint = (data: AnalysisData): number => {
   if (!data.pageSpeedData?.lighthouseResult?.audits?.['first-contentful-paint']) {
-    return 70; // قيمة افتراضية إذا لم تتوفر بيانات
+    return 0; // صفر في حالة عدم توفر البيانات
   }
 
-  const fcpScore = data.pageSpeedData.lighthouseResult.audits['first-contentful-paint'].score || 0;
-  return fcpScore * 100;
+  const fcp = data.pageSpeedData.lighthouseResult.audits['first-contentful-paint'];
+  const fcpValue = fcp.numericValue;
+  
+  // تقييم أكثر صرامة لـ FCP
+  if (fcpValue <= 1000) return 100; // ممتاز - أقل من ثانية
+  if (fcpValue <= 2000) return 80; // جيد - أقل من ثانيتين
+  if (fcpValue <= 3000) return 60; // مقبول
+  if (fcpValue <= 4000) return 40; // ضعيف
+  return 20; // سيء جداً
 };
 
 /**
@@ -43,9 +51,39 @@ const evaluateCLS = (data: AnalysisData): number => {
 };
 
 /**
- * تقييم الأداء العام للموقع
+ * تحسين تقييم الأداء العام مع معايير محددة
  */
 const evaluateOverallPerformance = (data: AnalysisData): number => {
+  if (!data.pageSpeedData?.lighthouseResult?.categories?.performance) {
+    return 0;
+  }
+
+  const metrics = data.pageSpeedData.lighthouseResult.audits;
+  const weights = {
+    'first-contentful-paint': 0.25,
+    'largest-contentful-paint': 0.25,
+    'cumulative-layout-shift': 0.25,
+    'speed-index': 0.15,
+    'total-blocking-time': 0.1
+  };
+
+  let weightedScore = 0;
+  let totalWeight = 0;
+
+  Object.entries(weights).forEach(([metric, weight]) => {
+    if (metrics[metric]?.score) {
+      weightedScore += metrics[metric].score * weight * 100;
+      totalWeight += weight;
+    }
+  });
+
+  return totalWeight > 0 ? Math.round(weightedScore / totalWeight) : 0;
+};
+
+/**
+ * تحسين تقييم الأداء العام للموقع
+ */
+const evaluateOverallPerformanceOld = (data: AnalysisData): number => {
   if (!data.pageSpeedData?.lighthouseResult?.categories?.performance) {
     return 65; // قيمة افتراضية
   }
@@ -55,15 +93,26 @@ const evaluateOverallPerformance = (data: AnalysisData): number => {
 };
 
 /**
- * تقييم إمكانية الوصول
+ * تقييم أكثر دقة لإمكانية الوصول
  */
 const evaluateAccessibility = (data: AnalysisData): number => {
   if (!data.pageSpeedData?.lighthouseResult?.categories?.accessibility) {
-    return 70; // قيمة افتراضية
+    return 0;
   }
 
-  const accessibilityScore = data.pageSpeedData.lighthouseResult.categories.accessibility.score || 0;
-  return accessibilityScore * 100;
+  const accessibilityAudits = data.pageSpeedData.lighthouseResult.audits;
+  const criticalIssues = ['aria-required-attr', 'aria-roles', 'color-contrast'];
+  
+  let score = data.pageSpeedData.lighthouseResult.categories.accessibility.score * 100;
+  
+  // خصم نقاط إضافية للمشاكل الحرجة
+  criticalIssues.forEach(issue => {
+    if (accessibilityAudits[issue]?.score === 0) {
+      score -= 15; // خصم 15 نقطة لكل مشكلة حرجة
+    }
+  });
+
+  return Math.max(0, score);
 };
 
 /**
@@ -99,8 +148,8 @@ const evaluateHTMLQuality = (data: AnalysisData): number => {
   }
 
   const messages = data.htmlValidationData.messages;
-  const errorCount = messages.filter(m => m.type === 'error').length;
-  const warningCount = messages.filter(m => m.type === 'warning').length;
+  const errorCount = messages.filter((m: { type: string; }) => m.type === 'error').length;
+  const warningCount = messages.filter((m: { type: string; }) => m.type === 'warning').length;
 
   // حساب الدرجة: 100 - (5 * عدد الأخطاء + 2 * عدد التحذيرات)
   const htmlScore = Math.max(0, 100 - (5 * errorCount + 2 * warningCount));
@@ -370,6 +419,78 @@ export function calculateNelsonPrinciples(data: AnalysisData, url: string): Nels
 }
 
 /**
+ * تحسين التحليل مع تفاصيل إضافية
+ */
+interface EnhancedNelsonAnalysis {
+  maxScore: number;
+  minScore: number;
+  medianScore: number;
+  standardDeviation: number;
+  highlighted: NelsonPrinciple[];
+  criticalIssues: NelsonPrinciple[];
+  allPrinciples: NelsonPrinciple[];
+}
+
+export function enhanceNelsonAnalysis(data: AnalysisData, url: string): EnhancedNelsonAnalysis {
+  const principles = calculateNelsonPrinciples(data, url);
+  const scores = principles.map(p => p.score);
+  
+  const stats = {
+    maxScore: Math.max(...scores),
+    minScore: Math.min(...scores),
+    medianScore: calculateMedian(scores),
+    standardDeviation: calculateStandardDeviation(scores)
+  };
+
+  // تحديد المشاكل الحرجة التي تحتاج اهتمام فوري
+  const criticalIssues = principles.filter(p => p.score < 40);
+  
+  return {
+    ...stats,
+    highlighted: principles.filter(p => p.score >= stats.medianScore + stats.standardDeviation),
+    criticalIssues,
+    allPrinciples: principles.sort((a, b) => b.score - a.score)
+  };
+}
+
+function calculateMedian(scores: number[]): number {
+  const sorted = [...scores].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+function calculateStandardDeviation(scores: number[]): number {
+  const mean = scores.reduce((a, b) => a + b) / scores.length;
+  const variance = scores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / scores.length;
+  return Math.sqrt(variance);
+}
+
+/**
+ * Provide design improvement suggestions for the 'التصميم الجمالي البسيط' principle based on its score.
+ */
+export function recommendDesignImprovements(score: number): string[] {
+  if (score < 60) {
+    return [
+      'تقليل العناصر الزائدة وترتيب المحتوى بشكل أبسط',
+      'ضبط نظام الألوان والخطوط لتحسين القراءة',
+      'تحسين سرعة التحميل وتقليل حجم الصور'
+    ];
+  } else if (score < 80) {
+    return [
+      'تحسين التفاصيل البصرية مثل الأيقونات والتنسيق',
+      'تقوية التباين بين العناصر النصية والخلفية',
+      'تحسين عرض العناصر بالشاشات الصغيرة'
+    ];
+  }
+  return [
+    'حافظ على التصميم النظيف والبسيط',
+    'تأكد من تناسق الهوية البصرية في جميع الصفحات'
+  ];
+}
+
+/**
  * الحصول على وصف لكل مبدأ من مبادئ نيلسون
  */
 function getDescriptionByPrinciple(key: string): string {
@@ -388,3 +509,40 @@ function getDescriptionByPrinciple(key: string): string {
   
   return descriptions[key] || '';
 }
+
+export async function performFullAnalysis(url: string): Promise<AnalysisData> {
+  const [htmlData, performanceData, securityData] = await Promise.allSettled([
+    validateHTML(url).catch(error => {
+      console.error('HTML validation failed:', error);
+      return null;
+    }),
+    getPageSpeedData(url).catch(error => {
+      console.error('PageSpeed analysis failed:', error);
+      return null;
+    }),
+    getSecurityAnalysis(url).catch(error => {
+      console.error('Security analysis failed:', error);
+      return null;
+    })
+  ]);
+
+  const analysisData: AnalysisData = {
+    websiteUrl: url,
+    analysisDate: new Date().toISOString(),
+    htmlValidationData: htmlData.status === 'fulfilled' ? htmlData.value : null,
+    pageSpeedData: performanceData.status === 'fulfilled' ? performanceData.value : null,
+    securityData: securityData.status === 'fulfilled' ? securityData.value : null,
+    nelsonPrinciples: [],
+    seoData: undefined,
+    accessibilityData: undefined,
+    cssValidationData: undefined,
+    screenshotUrl: ''
+  };
+
+  // Calculate principles with the available data
+  analysisData.nelsonPrinciples = calculateNelsonPrinciples(analysisData, url);
+  
+  return analysisData;
+}
+
+

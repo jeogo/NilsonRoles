@@ -1,3 +1,15 @@
+interface ValidationResult {
+  isValid: boolean;
+  url: string;
+  message?: string;
+}
+
+/**
+ * Validates and normalizes URL input
+ * Ensures URL has proper format and protocol
+ */
+
+
 /**
  * التحقق من صحة وجود الرابط بشكل فعلي
  * باستخدام عدة تقنيات للتأكد من وجود الموقع

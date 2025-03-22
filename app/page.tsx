@@ -1,31 +1,30 @@
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useInView } from 'react-intersection-observer';
 import { 
-  Button, Paper, Typography, TextField, Box, Container, 
-  CircularProgress, Alert, Snackbar, Stepper, Step, 
-  StepLabel, Fade, LinearProgress, Grid
+  Typography, Box, Container, Grid, Snackbar, Alert, Button, Dialog, DialogTitle,
+  DialogContent, DialogActions
 } from '@mui/material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import rtlPlugin from 'stylis-plugin-rtl';
-import { prefixer } from 'stylis';
 import { CacheProvider } from '@emotion/react';
-import createCache from '@emotion/cache';
-import SearchIcon from '@mui/icons-material/Search';
+import createEmotionCache from '../utils/createEmotionCache';
+import DownloadIcon from '@mui/icons-material/Download';
+import CodeIcon from '@mui/icons-material/Code';
+import { useRouter } from 'next/navigation';
 
-import analysisAnimation from '../animations/analysis.json';
 import { AnalysisData } from '../types/analysis';
 import { validateUrl } from '../utils/urlValidator';
 import { calculateNelsonPrinciples } from '../utils/analysisEngine';
+import { getPageSpeedData, validateHTML, getSecurityAnalysis } from '@/utils/api';
 
-// RTL setup for Arabic
-const cacheRtl = createCache({
-  key: 'muirtl',
-  stylisPlugins: [prefixer, rtlPlugin],
-});
+import Header from '../components/Header';
+import Footer from '../components/Footer';
+import FeatureCard from '../components/FeatureCard';
+import AnalysisForm from '../components/AnalysisForm';
+
+// Create a client-side cache for emotion
+const clientSideEmotionCache = createEmotionCache();
 
 const theme = createTheme({
   direction: 'rtl',
@@ -39,229 +38,80 @@ const theme = createTheme({
     secondary: {
       main: '#0097a7',
     },
-    background: {
-      default: '#f5f5f5',
-    },
   },
 });
 
-// Analysis steps
-const analysisSteps = [
-  'تحليل الأداء',
-  'تحليل المعايير',
-  'تحليل إمكانية الوصول',
-  'تقييم مبادئ نيلسون',
-  'إعداد التقرير'
-];
-
-// Add animation configurations
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.6 }
-};
-
-const pulseAnimation = {
-  scale: [1, 1.02, 1],
-  transition: { duration: 2, repeat: Infinity }
-};
-
-// Add loading animation options
-const defaultAnimationOptions = {
-  loop: true,
-  autoplay: true,
-  animationData: analysisAnimation,
-  rendererSettings: {
-    preserveAspectRatio: 'xMidYMid slice'
-  }
-};
-
-// Add features section data
+// Features data
 const features = [
   {
     title: 'تحليل شامل',
     description: 'تحليل متكامل وفقاً لمبادئ نيلسون العشرة للتصميم',
-    icon: '🎯'
+    icon: '🎯',
   },
   {
     title: 'تقرير مفصل',
-    description: 'تقرير PDF تفصيلي مع توصيات للتحسين',
-    icon: '📊'
+    description: 'تقرير تفصيلي مع توصيات للتحسين',
+    icon: '📊',
   },
   {
     title: 'تحليل الأداء',
     description: 'قياس سرعة الموقع وتحسين تجربة المستخدم',
-    icon: '⚡'
+    icon: '⚡',
   },
   {
     title: 'فحص الأمان',
     description: 'تحليل معايير الأمان وشهادات SSL',
-    icon: '🔒'
+    icon: '🔒',
   }
 ];
 
-const Header = () => (
-  <Box
-    sx={{
-      width: '100%',
-      py: 2,
-      px: 4,
-      background: 'rgba(255, 255, 255, 0.8)',
-      backdropFilter: 'blur(10px)',
-      borderBottom: '1px solid rgba(0,0,0,0.1)',
-      position: 'fixed',
-      top: 0,
-      zIndex: 1000,
-    }}
-  >
-    <Container maxWidth="lg">
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6" fontWeight="bold" color="primary">
-          تحليل المواقع
-        </Typography>
-        <Button
-          variant="outlined"
-          color="primary"
-          size="small"
-          sx={{ borderRadius: 2 }}
-          href="https://www.nngroup.com/articles/ten-usability-heuristics/"
-          target="_blank"
-        >
-          مبادئ نيلسون
-        </Button>
-      </Box>
-    </Container>
-  </Box>
-);
-
-const Footer = () => (
-  <Box
-    sx={{
-      width: '100%',
-      py: 4,
-      mt: 8,
-      background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(244,247,254,1) 100%)',
-    }}
-  >
-    <Container maxWidth="lg">
-      <Grid container spacing={4}>
-        <Grid item xs={12} md={6}>
-          <Typography variant="h6" fontWeight="bold" color="black" mb={2}>
-            عن المشروع
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            أداة تحليل المواقع تساعدك في تقييم موقعك وفقاً لمبادئ نيلسون العشرة للتصميم،
-            مع تحليل شامل للأداء والأمان وسهولة الاستخدام.
-          </Typography>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <Button variant="text" color="inherit" size="small">
-              سياسة الخصوصية
-            </Button>
-            <Button variant="text" color="inherit" size="small">
-              شروط الاستخدام
-            </Button>
-          </Box>
-        </Grid>
-      </Grid>
-    </Container>
-  </Box>
-);
-
-interface Feature {
-  title: string;
-  description: string;
-  icon: string;
-}
-
-const FeatureCard = ({ feature, index }: { feature: Feature; index: number }) => {
-  const [ref, inView] = useInView({
-    threshold: 0.1,
-    triggerOnce: true
-  });
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-    >
-      <Paper
-        sx={{
-          p: 3,
-          height: '100%',
-          background: 'rgba(255,255,255,0.8)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: 4,
-          transition: 'transform 0.3s ease-in-out',
-          '&:hover': {
-            transform: 'translateY(-5px)',
-          }
-        }}
-      >
-        <Typography variant="h2" sx={{ mb: 2, fontSize: '2.5rem' }}>
-          {feature.icon}
-        </Typography>
-        <Typography variant="h6" fontWeight="bold" gutterBottom>
-          {feature.title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {feature.description}
-        </Typography>
-      </Paper>
-    </motion.div>
-  );
-};
-
 export default function Home() {
   const router = useRouter();
-  const [url, setUrl] = useState('');
+  // Add state for controlling client-side rendering
+  const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [activeStep, setActiveStep] = useState(0);
-  const [showHelpTooltip, setShowHelpTooltip] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [forceAnalyze, setForceAnalyze] = useState(false); // إضافة حالة جديدة لتجاوز التحقق
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'warning'>('warning');
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [showDataDialog, setShowDataDialog] = useState(false);
 
-  const handleAnalyze = async () => {
+  // Use useEffect to mark when client-side rendering is active
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const handleAnalyze = async (url: string) => {
     if (!url) {
       setError('يرجى إدخال رابط موقع الويب');
       return;
     }
     
-    // تحقق محسّن من صلاحية الرابط
     setLoading(true);
     setError('');
-    setSnackbarMessage('جاري التحقق من الرابط...');
-    setOpenSnackbar(true);
+    setProgress(0);
+    showSnackbar('جاري التحقق من الرابط...', 'warning');
     
     try {
+      // Validate URL
       const validationResult = await validateUrl(url);
-      
       if (!validationResult.isValid) {
         setError(validationResult.message || 'الرابط غير صالح');
         setLoading(false);
         return;
       }
       
-      // في حال نجاح التحقق نستمر في عملية التحليل
       const processedUrl = validationResult.url;
-      setUrl(processedUrl);
       
-      setActiveStep(0);
-      setAnalysisProgress(0);
-      
-      // بداية التحليل مع تقدم متحرك
+      // Progress simulation
       const progressInterval = setInterval(() => {
-        setAnalysisProgress(prev => Math.min(prev + 1, 90));
+        setProgress(prev => Math.min(prev + 2, 90));
       }, 200);
       
-      // بقية كود التحليل...
-      let analysisData: AnalysisData = {
+      // Initialize analysis data
+      let data: AnalysisData = {
         websiteUrl: processedUrl,
         analysisDate: new Date().toISOString(),
         pageSpeedData: null,
@@ -270,172 +120,126 @@ export default function Home() {
         securityData: null,
         cssValidationData: null,
         nelsonPrinciples: [],
+        screenshotUrl: '',
       };
 
-      // 1. Google PageSpeed API - Performance analysis
-      try {
-        setActiveStep(0); // Update step indicator
-        const pageSpeedUrl = process.env.NEXT_PUBLIC_API_URL_1;
-        const pageSpeedKey = process.env.NEXT_PUBLIC_API_KEY_1;
-        
-        if (pageSpeedUrl && pageSpeedKey) {
-          // Use a proxy to avoid CORS issues
-          const response = await fetch(`${pageSpeedUrl}?url=${encodeURIComponent(processedUrl)}&key=${pageSpeedKey}&category=performance&strategy=mobile`);
-          if (!response.ok) {
-            if (response.status === 400) {
-              console.error("PageSpeed API 400 error, skipping performance score...");
-              // Provide minimal fallback data
-              analysisData.pageSpeedData = {
-                lighthouseResult: {
-                  categories: {
-                    performance: { score: 0.6 },
-                  },
-                  audits: {}
-                }
-              };
-            } else {
-              throw new Error(`PageSpeed API error: ${response.status}`);
-            }
-          } else {
-            const data = await response.json();
-            analysisData.pageSpeedData = data;
-          }
-        }
-      } catch (pageSpeedError) {
-        console.error("PageSpeed API error:", pageSpeedError);
-        setSnackbarMessage('خطأ في تحليل الأداء. جاري المتابعة...');
-        setOpenSnackbar(true);
+      // Perform API calls in parallel
+      showSnackbar('جاري تحليل الموقع...', 'warning');
+      
+      console.log('Starting API calls for URL:', processedUrl);
+      
+      // Store raw API responses for debugging
+      const rawResponses: Record<string, any> = {};
+      
+      const [pageSpeedResult, htmlResult, securityResult] = await Promise.allSettled([
+        getPageSpeedData(processedUrl).then(response => {
+          console.log('PageSpeed API response received');
+          rawResponses.pageSpeed = response;
+          return response;
+        }),
+        validateHTML(processedUrl).then(response => {
+          console.log('HTML Validation API response received');
+          rawResponses.html = response;
+          return response;
+        }),
+        getSecurityAnalysis(processedUrl).then(response => {
+          console.log('Security API response received');
+          rawResponses.security = response;
+          return response;
+        })
+      ]);
+      
+      // Update analysis data with results
+      if (pageSpeedResult.status === 'fulfilled') {
+        data.pageSpeedData = pageSpeedResult.value;
+        console.log('PageSpeed data added to analysis');
+      } else {
+        console.error('PageSpeed API failed:', pageSpeedResult.reason);
       }
-
-      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UX
-
-      // 2. W3C HTML Validator API - HTML standards compliance
-      try {
-        setActiveStep(1); // Update step indicator
-        const htmlValidatorUrl = process.env.NEXT_PUBLIC_API_URL_3;
-        if (htmlValidatorUrl) {
-          // Use a CORS proxy for W3C validator
-          const corsProxyUrl = 'https://cors-anywhere.herokuapp.com/';
-          const response = await fetch(`${corsProxyUrl}${htmlValidatorUrl}${encodeURIComponent(processedUrl)}`);
-          if (!response.ok) {
-            // Create a fallback response if the API fails
-            analysisData.htmlValidationData = {
-              messages: [
-                { type: 'info', message: 'Basic HTML structure validation passed' },
-                { type: 'warning', message: 'Consider adding meta descriptions for better SEO' }
-              ]
-            };
-          } else {
-            const data = await response.json();
-            analysisData.htmlValidationData = data;
-          }
-        }
-      } catch (htmlError) {
-        console.error("HTML Validation API error:", htmlError);
-        // Use fallback data
-        analysisData.htmlValidationData = {
-          messages: [
-            { type: 'info', message: 'Basic HTML structure appears valid' },
-            { type: 'warning', message: 'Consider improving semantic structure' }
-          ]
-        };
+      
+      if (htmlResult.status === 'fulfilled') {
+        data.htmlValidationData = htmlResult.value;
+        console.log('HTML validation data added to analysis');
+      } else {
+        console.error('HTML validation API failed:', htmlResult.reason);
       }
-
-      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UX
-
-      // 3. Skip URLScan.io API due to CORS issues - create synthetic security data instead
-      setActiveStep(2);
-      try {
-        // Create synthetic security data based on URL features
-        const domain = new URL(processedUrl).hostname;
-        const hasHTTPS = processedUrl.startsWith('https://');
-        
-        analysisData.securityData = {
-          results: [
-            {
-              task: {
-                domain: domain
-              },
-              page: {
-                url: processedUrl,
-                tlsValid: hasHTTPS,
-                statusCode: 200
-              },
-              stats: {
-                securityScore: hasHTTPS ? 85 : 60
-              },
-              lists: {
-                urls: []
-              }
-            }
-          ],
-          total: 1
-        };
-      } catch (securityError) {
-        console.error("Security analysis error:", securityError);
-        // Fallback security data
-        analysisData.securityData = {
-          results: [
-            {
-              stats: {
-                securityScore: 70
-              },
-              task: {
-                domain: ''
-              },
-              page: {
-                url: '',
-                tlsValid: false,
-                statusCode: 0
-              },
-              lists: {
-                urls: []
-              }
-            }
-          ],
-          total: 1
-        };
+      
+      if (securityResult.status === 'fulfilled') {
+        data.securityData = securityResult.value;
+        console.log('Security data added to analysis');
+      } else {
+        console.error('Security API failed:', securityResult.reason);
       }
-
-      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UX
-
-      // 4. Calculate Nelson's usability principles
-      setActiveStep(3);
-      analysisData.nelsonPrinciples = calculateNelsonPrinciples(analysisData, processedUrl);
       
-      await new Promise(resolve => setTimeout(resolve, 800)); // Small delay for UX
       
-      // 5. Prepare report
-      setActiveStep(4);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UX
+      // Calculate Nelson principles
+      console.log('Calculating Nelson principles');
+      data.nelsonPrinciples = calculateNelsonPrinciples(data, processedUrl);
       
-      // Store the analysis results in localStorage
-      localStorage.setItem('websiteData', JSON.stringify({
-        ...analysisData,
-        url: processedUrl, // Add this for the report page
-        analysisDate: new Date().toISOString(),
-      }));
+      // Save data
+      localStorage.setItem('websiteData', JSON.stringify(data));
+      setAnalysisData(data);
       
-      // Clean up interval
+      // Complete analysis
       clearInterval(progressInterval);
-      setAnalysisProgress(100);
-
-      // Navigate after a short delay
-      setTimeout(() => router.push('/report'), 500);
+      setProgress(100);
+      
+      // Show success and results
+      showSnackbar('تم الانتهاء من التحليل بنجاح!', 'success');
+      
+      // Calculate average score
+      const avgScore = Math.round(
+        data.nelsonPrinciples.reduce((sum, p) => sum + p.score, 0) / 
+        data.nelsonPrinciples.length
+      );
+      
+      console.log('Analysis completed with average score:', avgScore);
+      
+      // Show simple results
+      setTimeout(() => {
+        alert(`تم تحليل ${processedUrl} بنجاح!\n\nالنتيجة الإجمالية: ${avgScore}%`);
+        setLoading(false);
+        router.push('/report');
+      }, 1000);
+      
     } catch (error) {
       console.error("Analysis error:", error);
-      setSnackbarMessage('حدث خطأ أثناء التحليل. يرجى المحاولة مرة أخرى.');
-      setOpenSnackbar(true);
+      showSnackbar('حدث خطأ أثناء التحليل. يرجى المحاولة مرة أخرى.', 'error');
       setLoading(false);
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
+  const downloadAnalysisData = () => {
+    if (!analysisData) return;
+    
+    const dataStr = JSON.stringify(analysisData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analysis-${analysisData.websiteUrl.replace(/https?:\/\//, '').replace(/[\/\.]/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showSnackbar('تم تنزيل بيانات التحليل بنجاح!', 'success');
   };
 
+  const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  // Only render with Emotion cache on the client side to avoid hydration mismatch
+  if (!isClient) {
+    return null; // Return null during SSR
+  }
+
   return (
-    <CacheProvider value={cacheRtl}>
+    <CacheProvider value={clientSideEmotionCache}>
       <ThemeProvider theme={theme}>
         <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7ff 0%, #ffffff 100%)' }}>
           <Header />
@@ -466,7 +270,7 @@ export default function Home() {
                     color="text.secondary"
                     sx={{ mb: 4 }}
                   >
-                    تحليل شامل لموقعك وفق قواعد نظرية نيلسون للتصميم مع توصيات للتحسين
+                    تحليل شامل لموقعك وفق قواعد نظرية نيلسون للتصميم
                   </Typography>
                 </motion.div>
               </Grid>
@@ -478,126 +282,36 @@ export default function Home() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                 >
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 4,
-                      borderRadius: 4,
-                      background: 'rgba(255,255,255,0.8)',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    <Box sx={{ mb: 4 }}>
-                      <TextField
-                        fullWidth
-                        variant="outlined"
-                        label="رابط الموقع"
-                        placeholder="https://example.com"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        InputProps={{
-                          startAdornment: <SearchIcon sx={{ color: 'action.active', mr: 1 }} />,
-                          sx: { 
-                            borderRadius: 2,
-                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                            '&:hover': {
-                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            }
-                          }
-                        }}
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            height: '60px',
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                              transform: 'translateY(-2px)',
-                              boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                            }
-                          }
-                        }}
-                        error={!!error}
-                        helperText={error}
-                        disabled={loading}
-                      />
-                    </Box>
-
-                    {/* Analysis Progress */}
-                    {loading && (
-                      <Fade in={loading}>
-                        <Box sx={{ width: '100%', mb: 4 }}>
-                          <LinearProgress 
-                            variant="determinate" 
-                            value={analysisProgress}
-                            sx={{
-                              height: 10,
-                              borderRadius: 5,
-                              backgroundColor: 'rgba(0,0,0,0.05)',
-                              '& .MuiLinearProgress-bar': {
-                                background: 'linear-gradient(90deg, #2c6faa, #3c8dda)'
-                              }
-                            }}
-                          />
-                          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-                            <Typography variant="body2" color="text.secondary">
-                              {`جاري التحليل... ${analysisProgress}%`}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Fade>
-                    )}
-
-                    {/* Analysis Steps */}
-                    {loading && (
-                      <Box sx={{ width: '100%', mb: 4 }}>
-                        <Stepper activeStep={activeStep} alternativeLabel>
-                          {analysisSteps.map((label, index) => (
-                            <Step 
-                              key={label}
-                              completed={activeStep > index}
-                            >
-                              <StepLabel>{label}</StepLabel>
-                            </Step>
-                          ))}
-                        </Stepper>
-                      </Box>
-                    )}
-
-                    {/* Analysis Button */}
-                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                      <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Button
-                          variant="contained"
-                          size="large"
-                          onClick={handleAnalyze}
-                          disabled={loading}
-                          sx={{
-                            minWidth: '200px',
-                            py: 1.5,
-                            fontSize: '1.1rem',
-                            borderRadius: 2,
-                            background: 'linear-gradient(45deg, #2c6faa, #3c8dda)',
-                            boxShadow: '0 4px 15px rgba(44, 111, 170, 0.3)',
-                            '&:hover': {
-                              background: 'linear-gradient(45deg, #245a8c, #3178b9)',
-                            },
-                          }}
-                        >
-                          {loading ? (
-                            <>
-                              <CircularProgress size={24} sx={{ color: 'white', mr: 1 }} />
-                              جاري التحليل...
-                            </>
-                          ) : 'تحليل الموقع'}
-                        </Button>
-                      </motion.div>
-                    </Box>
-                  </Paper>
+                  <AnalysisForm 
+                    onAnalyze={handleAnalyze}
+                    loading={loading}
+                    error={error}
+                    progress={progress}
+                  />
                 </motion.div>
               </Grid>
+
+              {/* Data Actions (only shown after analysis) */}
+              {analysisData && (
+                <Grid item xs={12} sx={{ mt: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                    <Button 
+                      variant="outlined" 
+                      startIcon={<DownloadIcon />}
+                      onClick={downloadAnalysisData}
+                    >
+                      تنزيل بيانات التحليل (JSON)
+                    </Button>
+                    <Button 
+                      variant="outlined" 
+                      startIcon={<CodeIcon />}
+                      onClick={() => setShowDataDialog(true)}
+                    >
+                      عرض البيانات الخام
+                    </Button>
+                  </Box>
+                </Grid>
+              )}
 
               {/* Features Section */}
               <Grid item xs={12} sx={{ mt: 8 }}>
@@ -613,7 +327,12 @@ export default function Home() {
                 <Grid container spacing={3}>
                   {features.map((feature, index) => (
                     <Grid item xs={12} sm={6} md={3} key={index}>
-                      <FeatureCard feature={feature} index={index} />
+                      <FeatureCard 
+                        title={feature.title}
+                        description={feature.description}
+                        icon={feature.icon}
+                        index={index}
+                      />
                     </Grid>
                   ))}
                 </Grid>
@@ -624,20 +343,39 @@ export default function Home() {
           <Footer />
         </Box>
 
+        {/* Raw Data Dialog */}
+        <Dialog
+          open={showDataDialog}
+          onClose={() => setShowDataDialog(false)}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle>بيانات التحليل الخام</DialogTitle>
+          <DialogContent>
+            <Box sx={{ maxHeight: '70vh', overflow: 'auto' }}>
+              <pre style={{ direction: 'ltr', textAlign: 'left', fontSize: '12px', lineHeight: 1.5 }}>
+                {analysisData ? JSON.stringify(analysisData, null, 2) : 'لا توجد بيانات'}
+              </pre>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowDataDialog(false)}>إغلاق</Button>
+            <Button onClick={downloadAnalysisData} startIcon={<DownloadIcon />}>
+              تنزيل البيانات
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         <Snackbar
-          open={openSnackbar}
+          open={snackbarOpen}
           autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
+          onClose={() => setSnackbarOpen(false)}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         >
           <Alert 
-            onClose={handleCloseSnackbar} 
-            severity="warning"
-            sx={{ 
-              width: '100%',
-              borderRadius: 2,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-            }}
+            onClose={() => setSnackbarOpen(false)} 
+            severity={snackbarSeverity}
+            sx={{ width: '100%', borderRadius: 2 }}
           >
             {snackbarMessage}
           </Alert>

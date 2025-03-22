@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import { ThemeProvider } from './components/ThemeProvider';
 import './globals.css';
 
 const geistSans = Geist({
@@ -50,7 +49,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className={`${geistSans.variable} ${geistMonoFont.variable} antialiased min-h-screen bg-background text-foreground transition-colors`}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <>{children}</>
       </body>
     </html>
   );
